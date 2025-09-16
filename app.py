@@ -47,10 +47,10 @@ with st.form("items_form", clear_on_submit=False):
         num_rows="dynamic",
         column_config={
             "品名": st.column_config.TextColumn("品名"),
-            "數量B": st.column_config.NumberColumn("數量B", min_value=0, step=1),
-            "單價C(RMB)": st.column_config.NumberColumn("單價C (RMB)", min_value=0.0, step=0.1),
-            "境內運費E(RMB)": st.column_config.NumberColumn("境內運費 E (RMB)", min_value=0.0, step=0.1),
-            "單件重量G(kg)": st.column_config.NumberColumn("單件重量 G (kg)", min_value=0.0, step=0.01),
+            "數量B": st.column_config.NumberColumn("數量B", min_value=0, step=1),         # 整數
+            "單價C(RMB)": st.column_config.NumberColumn("單價C (RMB)", min_value=0.0, step=0.01, format="%.2f"),
+            "境內運費E(RMB)": st.column_config.NumberColumn("境內運費 E (RMB)", min_value=0.0, step=0.01, format="%.2f"),
+            "單件重量G(kg)": st.column_config.NumberColumn("單件重量 G (kg)", min_value=0.0, step=0.01, format="%.2f"),
         },
         hide_index=True,
     )
@@ -163,15 +163,31 @@ if st.button("計算", type="primary"):
                       "商品價格D(RMB)", "總重量H(kg)", "國際運費F(RMB)", "單項金額(含稅/換匯)"]:
                 result_df[c] = result_df[c].round(q)
 
-            st.subheader("② 計算明細")
-            st.dataframe(result_df, use_container_width=True)
+            # 不要修改數值本體，只在渲染時指定顯示為兩位小數
+st.subheader("② 計算明細")
+st.dataframe(
+    result_df,
+    use_container_width=True,
+    column_config={
+        "單價C(RMB)": st.column_config.NumberColumn("單價C(RMB)", format="%.2f"),
+        "境內運費E(RMB)": st.column_config.NumberColumn("境內運費E(RMB)", format="%.2f"),
+        "單件重量G(kg)": st.column_config.NumberColumn("單件重量G(kg)", format="%.2f"),
+        "商品價格D(RMB)": st.column_config.NumberColumn("商品價格D(RMB)", format="%.2f"),
+        "總重量H(kg)": st.column_config.NumberColumn("總重量H(kg)", format="%.2f"),
+        "國際運費F(RMB)": st.column_config.NumberColumn("國際運費F(RMB)", format="%.2f"),
+        "單項金額(含稅/換匯)": st.column_config.NumberColumn("單項金額(含稅/換匯)", format="%.2f"),
+        # "國際運費單價(RMB/kg)" 若希望整數顯示可不設 format
+    },
+)
 
-            total_sum = float(result_df["單項金額(含稅/換匯)"].sum())
-            st.success(f"✅ 全部商品代購總金額：約 {format(round(total_sum, q), ',')} 元")
+total_sum = float(result_df["單項金額(含稅/換匯)"].sum())
+st.success(f"✅ 全部商品代購總金額：約 {total_sum:,.2f} 元")   # 只格式化顯示，不改動數值
+
 
             total_weight = float(result_df["總重量H(kg)"].sum())
             st.caption(f"總重量（所有商品加總）：{round(total_weight, 2)} kg")
 # ======= 計算區結束 =======
+
 
 
 
