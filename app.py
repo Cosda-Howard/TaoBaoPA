@@ -53,8 +53,6 @@ edited_df = st.data_editor(
 
 # 之後計算請用 st.session_state.items_df（或 edited_df 都可）
 items_df = st.session_state.items_df
-# 把最新編輯狀態回存
-st.session_state.items_df = edited_df
 
 # ------- 計算函數 -------
 def freight_unit_by_weight(total_weight_kg: float) -> float:
@@ -134,4 +132,5 @@ if st.button("計算", type="primary"):
         st.warning("請先輸入至少一筆有效商品資料（數量與單價不可全部為 0）。")
 
 st.caption("提示：下表可直接按右下角 + 來新增列；也可刪除列、編輯數字。")
+
 
