@@ -23,39 +23,44 @@ with st.sidebar:
 DEFAULT_ROWS = [
     {"品名": "", "數量B": 1, "單價C(RMB)": 0.0, "境內運費E(RMB)": 0.0, "單件重量G(kg)": 0.0}
 ]
-
 if "items_df" not in st.session_state:
     st.session_state.items_df = pd.DataFrame(DEFAULT_ROWS)
 
+def _to_df(val):
+    if isinstance(val, pd.DataFrame):
+        return val.copy()
+    elif isinstance(val, list):
+        return pd.DataFrame(val)
+    elif isinstance(val, dict):
+        return pd.DataFrame.from_dict(val)
+    else:
+        return pd.DataFrame(DEFAULT_ROWS)
+
 st.subheader("① 輸入商品資料（可直接新增/刪除列）")
 
-# 讓使用者編輯；這裡回傳值有時是 DataFrame、有時是 list[dict]
-edited_value = st.data_editor(
-    st.session_state.items_df,
-    key="items_editor",
-    use_container_width=True,
-    num_rows="dynamic",
-    column_config={
-        "品名": st.column_config.TextColumn("品名"),
-        "數量B": st.column_config.NumberColumn("數量B", min_value=0, step=1),
-        "單價C(RMB)": st.column_config.NumberColumn("單價C (RMB)", min_value=0.0, step=0.1),
-        "境內運費E(RMB)": st.column_config.NumberColumn("境內運費 E (RMB)", min_value=0.0, step=0.1),
-        "單件重量G(kg)": st.column_config.NumberColumn("單件重量 G (kg)", min_value=0.0, step=0.01),
-    },
-    hide_index=True,
-)
+# ✅ 用 form 包住，避免每次格子提交就 rerun
+with st.form("items_form", clear_on_submit=False):
+    edited_value = st.data_editor(
+        st.session_state.items_df,
+        key="items_editor",
+        use_container_width=True,
+        num_rows="dynamic",
+        column_config={
+            "品名": st.column_config.TextColumn("品名"),
+            "數量B": st.column_config.NumberColumn("數量B", min_value=0, step=1),
+            "單價C(RMB)": st.column_config.NumberColumn("單價C (RMB)", min_value=0.0, step=0.1),
+            "境內運費E(RMB)": st.column_config.NumberColumn("境內運費 E (RMB)", min_value=0.0, step=0.1),
+            "單件重量G(kg)": st.column_config.NumberColumn("單件重量 G (kg)", min_value=0.0, step=0.01),
+        },
+        hide_index=True,
+    )
+    submitted = st.form_submit_button("✅ 更新資料")
 
-# 🔧 關鍵：不管回傳什麼型態，都標準化成 DataFrame 再存回 session_state
-if isinstance(edited_value, pd.DataFrame):
-    st.session_state.items_df = edited_value.copy()
-elif isinstance(edited_value, list):
-    st.session_state.items_df = pd.DataFrame(edited_value)
-elif isinstance(edited_value, dict):
-    st.session_state.items_df = pd.DataFrame.from_dict(edited_value)
-else:
-    st.session_state.items_df = pd.DataFrame(DEFAULT_ROWS)
+# 只有按下「更新資料」時才把改動寫回狀態
+if submitted:
+    st.session_state.items_df = _to_df(edited_value)
 
-# 計算時，請用這個 df
+# 下游計算都用這個 df（不會再出現第一次跳掉）
 items_df = st.session_state.items_df
 
 # ------- 計算函數 -------
@@ -136,6 +141,7 @@ if st.button("計算", type="primary"):
         st.warning("請先輸入至少一筆有效商品資料（數量與單價不可全部為 0）。")
 
 st.caption("提示：下表可直接按右下角 + 來新增列；也可刪除列、編輯數字。")
+
 
 
 
