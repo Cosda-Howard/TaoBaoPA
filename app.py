@@ -107,40 +107,72 @@ def calc_row(row):
         "單項金額(含稅/換匯)": total_item,
     }
 
-# ------- 計算所有列 -------
+# ======= 計算區（取代原本用 edited_df 的程式）=======
 if st.button("計算", type="primary"):
-    # 過濾掉空白列（數量與單價皆為 0 視為空白）
-    filtered = edited_df.fillna(0)
-    filtered = filtered[~((filtered["數量B"] == 0) & (filtered["單價C(RMB)"] == 0) &
-                          (filtered["境內運費E(RMB)"] == 0) & (filtered["單件重量G(kg)"] == 0))]
+    # 1) 取用最新資料（來自 form 提交後的 session_state）
+    df = st.session_state.items_df.copy()
 
-    results = [calc_row(r) for r in filtered.to_dict(orient="records")]
-    if results:
-        result_df = pd.DataFrame(results)
-
-        # 四捨五入顯示
-        q = int(rounding)
-        cols_round = [
-            "單價C(RMB)", "境內運費E(RMB)", "單件重量G(kg)",
-            "商品價格D(RMB)", "總重量H(kg)", "國際運費F(RMB)",
-            "單項金額(含稅/換匯)"
-        ]
-        for c in cols_round:
-            result_df[c] = result_df[c].apply(lambda x: round(float(x), q))
-
-        st.subheader("② 計算明細")
-        st.dataframe(result_df, use_container_width=True)
-
-        total_sum = float(result_df["單項金額(含稅/換匯)"].sum())
-        st.success(f"✅ 全部商品代購總金額：約 {round(total_sum, q)} 元")
-
-        # 小結資訊
-        total_weight = float(result_df["總重量H(kg)"].sum())
-        st.caption(f"總重量（所有商品加總）：{round(total_weight, 2)} kg")
+    if df.empty:
+        st.warning("目前沒有可計算的資料，請先在上方表格輸入並按「✅ 更新資料」。")
     else:
-        st.warning("請先輸入至少一筆有效商品資料（數量與單價不可全部為 0）。")
+        # 2) 欄位轉成數值、補 NaN
+        num_cols = ["數量B", "單價C(RMB)", "境內運費E(RMB)", "單件重量G(kg)"]
+        for c in num_cols:
+            df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0)
 
-st.caption("提示：下表可直接按右下角 + 來新增列；也可刪除列、編輯數字。")
+        # 3) 移除全 0 的空白列
+        mask_empty = (df["數量B"] == 0) & (df["單價C(RMB)"] == 0) & \
+                     (df["境內運費E(RMB)"] == 0) & (df["單件重量G(kg)"] == 0)
+        df = df[~mask_empty]
+
+        if df.empty:
+            st.warning("沒有有效的商品列可計算，請輸入數量/單價等資料後再試。")
+        else:
+            # 4) 逐列計算
+            results = []
+            for _, row in df.iterrows():
+                B = float(row["數量B"])
+                C = float(row["單價C(RMB)"])
+                E = float(row["境內運費E(RMB)"])
+                G = float(row["單件重量G(kg)"])
+
+                D = B * C                 # 商品價格
+                H = B * G                 # 總重量
+                unit = freight_unit_by_weight(H)
+                F = H * unit              # 國際運費（人民幣）
+
+                total_item = (D + E + F) * A * (1 + service_fee) * (1 + tax)
+
+                results.append({
+                    "品名": row.get("品名", ""),
+                    "數量B": B,
+                    "單價C(RMB)": C,
+                    "境內運費E(RMB)": E,
+                    "單件重量G(kg)": G,
+                    "商品價格D(RMB)": D,
+                    "總重量H(kg)": H,
+                    "國際運費單價(RMB/kg)": unit,
+                    "國際運費F(RMB)": F,
+                    "單項金額(含稅/換匯)": total_item,
+                })
+
+            # 5) 輸出結果與總計
+            result_df = pd.DataFrame(results)
+            q = int(rounding)
+            for c in ["單價C(RMB)", "境內運費E(RMB)", "單件重量G(kg)",
+                      "商品價格D(RMB)", "總重量H(kg)", "國際運費F(RMB)", "單項金額(含稅/換匯)"]:
+                result_df[c] = result_df[c].round(q)
+
+            st.subheader("② 計算明細")
+            st.dataframe(result_df, use_container_width=True)
+
+            total_sum = float(result_df["單項金額(含稅/換匯)"].sum())
+            st.success(f"✅ 全部商品代購總金額：約 {format(round(total_sum, q), ',')} 元")
+
+            total_weight = float(result_df["總重量H(kg)"].sum())
+            st.caption(f"總重量（所有商品加總）：{round(total_weight, 2)} kg")
+# ======= 計算區結束 =======
+
 
 
 
