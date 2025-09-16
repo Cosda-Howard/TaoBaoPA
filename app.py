@@ -24,21 +24,15 @@ DEFAULT_ROWS = [
     {"品名": "", "數量B": 1, "單價C(RMB)": 0.0, "境內運費E(RMB)": 0.0, "單件重量G(kg)": 0.0}
 ]
 
-# 只在第一次建立
 if "items_df" not in st.session_state:
     st.session_state.items_df = pd.DataFrame(DEFAULT_ROWS)
 
-def _sync_editor_to_state():
-    """在使用者每次編輯後，先把編輯結果寫回 session_state，
-    再觸發 rerun；避免第一次輸入被舊資料覆蓋。"""
-    st.session_state.items_df = st.session_state["items_editor"].copy()
-
 st.subheader("① 輸入商品資料（可直接新增/刪除列）")
 
-edited_df = st.data_editor(
+# 讓使用者編輯；這裡回傳值有時是 DataFrame、有時是 list[dict]
+edited_value = st.data_editor(
     st.session_state.items_df,
-    key="items_editor",            # 關鍵 1：給 editor 一個固定 key
-    on_change=_sync_editor_to_state, # 關鍵 2：每次變更先寫回 session_state
+    key="items_editor",
     use_container_width=True,
     num_rows="dynamic",
     column_config={
@@ -51,7 +45,17 @@ edited_df = st.data_editor(
     hide_index=True,
 )
 
-# 之後計算請用 st.session_state.items_df（或 edited_df 都可）
+# 🔧 關鍵：不管回傳什麼型態，都標準化成 DataFrame 再存回 session_state
+if isinstance(edited_value, pd.DataFrame):
+    st.session_state.items_df = edited_value.copy()
+elif isinstance(edited_value, list):
+    st.session_state.items_df = pd.DataFrame(edited_value)
+elif isinstance(edited_value, dict):
+    st.session_state.items_df = pd.DataFrame.from_dict(edited_value)
+else:
+    st.session_state.items_df = pd.DataFrame(DEFAULT_ROWS)
+
+# 計算時，請用這個 df
 items_df = st.session_state.items_df
 
 # ------- 計算函數 -------
@@ -132,5 +136,6 @@ if st.button("計算", type="primary"):
         st.warning("請先輸入至少一筆有效商品資料（數量與單價不可全部為 0）。")
 
 st.caption("提示：下表可直接按右下角 + 來新增列；也可刪除列、編輯數字。")
+
 
 
